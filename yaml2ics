@@ -1,0 +1,57 @@
+#!/usr/bin/env ruby
+
+require 'time'
+require 'yaml'
+require 'icalendar'
+
+class Event
+  attr_accessor :calendar_title, :start_time, :end_time, :title, :description
+
+  def initialize(calendar_title:, start_time:, end_time:, title:, description:)
+    @calendar_title = calendar_title
+    @start_time = start_time
+    @end_time = end_time
+    @title = title
+    @description = description
+  end
+
+  def ical
+    e = Icalendar::Event.new
+
+    e.dtstart     = start_time
+    e.dtend       = end_time
+    e.summary     = "#{title} [#{calendar_title}]"
+    e.description = description
+
+    e.alarm do |a|
+      a.trigger = '-P30M' # 30 minutes before
+    end
+
+    e
+  end
+end
+
+def parse_file(file)
+  data = YAML.load_file(file, permitted_classes: [Time])
+  data = data.transform_keys(&:to_sym)
+
+  data[:events].each do |d|
+    d = d.transform_keys(&:to_sym)
+    e = Event.new(calendar_title: data[:title], **d)
+
+    @cal.add_event(e.ical)
+  end
+end
+
+@cal = Icalendar::Calendar.new
+@cal.timezone do |t|
+  t.tzid = 'Europe/Brussels'
+end
+
+ARGV.each do |glob|
+  Dir.glob(glob) do |file|
+    parse_file(file)
+  end
+end
+
+puts @cal.to_ical
